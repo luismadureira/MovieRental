@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using MovieRental.Movie;
 using MovieRental.Rental;
 
 namespace MovieRental.Controllers
@@ -16,12 +15,19 @@ namespace MovieRental.Controllers
             _features = features;
         }
 
-
         [HttpPost]
-        public IActionResult Post([FromBody] Rental.Rental rental)
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(Rental.Rental))]
+        public async Task<IActionResult> Post([FromBody] Rental.Rental rental)
         {
-	        return Ok(_features.Save(rental));
+            return StatusCode(StatusCodes.Status201Created, await _features.SaveAsync(rental));
         }
 
-	}
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Rental.Rental))]
+        public async Task<IActionResult> Get([FromQuery] string customerName)
+        {
+            return StatusCode(StatusCodes.Status200OK, await _features.GetRentalsByCustomerNameAsync(customerName));
+        }
+
+    }
 }
