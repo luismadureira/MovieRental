@@ -7,28 +7,37 @@ namespace MovieRental.WPF.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {
-        private UserControl _currentView;
+        #region Fields
+        private UserControl? _currentView;
+        #endregion
 
-        public UserControl CurrentView
+        #region Properties
+        public UserControl? CurrentView
         {
             get => _currentView;
             set { _currentView = value; OnPropertyChanged(); }
         }
+        #endregion
 
+        #region Commands
         public RelayCommand OpenCustomersViewCommand { get; }
         public RelayCommand OpenMoviesViewCommand { get; }
         public RelayCommand OpenRentalsViewCommand { get; }
+        #endregion
 
+        #region Constructor
         public MainViewModel()
         {
             OpenCustomersViewCommand = new RelayCommand(OpenCustomersView);
             OpenMoviesViewCommand = new RelayCommand(OpenMoviesView);
             OpenRentalsViewCommand = new RelayCommand(OpenRentalsView);
         }
+        #endregion
 
-        private void OpenRentalsView()
+        #region Command Methods
+        private void OpenCustomersView()
         {
-            CurrentView = new RentalsView();
+            CurrentView = new CustomersView();
         }
 
         private void OpenMoviesView()
@@ -36,13 +45,19 @@ namespace MovieRental.WPF.ViewModels
             CurrentView = new MoviesView();
         }
 
-        private void OpenCustomersView()
+        private void OpenRentalsView()
         {
-            CurrentView = new CustomersView();
+            CurrentView = new RentalsView();
         }
+        #endregion
 
+        #region INotifyPropertyChanged Implementation
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
     }
 }

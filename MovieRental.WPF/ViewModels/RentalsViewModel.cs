@@ -10,64 +10,81 @@ namespace MovieRental.WPF.ViewModels
 {
     public class RentalsViewModel : INotifyPropertyChanged
     {
+        #region Fields
         private readonly HttpClient _httpClient = new HttpClient();
+        private int _daysRented;
+        private double _paymentValue;
+        private string _customerToSearch = string.Empty;
+        private string _statusMessage = string.Empty;
+        private string _errorMessage = string.Empty;
+        private Models.PaymentMethod _selectedPaymentMethod;
+        private Models.Customer? _selectedCustomer;
+        private Models.Movie? _selectedMovie;
+        #endregion
 
+        #region Collections
         public ObservableCollection<Models.Rental> Rentals { get; set; } = new();
         public ObservableCollection<Models.Customer> Customers { get; set; } = new();
         public ObservableCollection<Models.Movie> Movies { get; set; } = new();
         public IEnumerable<Models.PaymentMethod> PaymentMethods => Enum.GetValues(typeof(Models.PaymentMethod)).Cast<Models.PaymentMethod>();
+        #endregion
 
-        public int DaysRented { get; set; }
-        public double PaymentValue { get; set; }
-        public string CustomerToSearch { get; set; }
-
-        private Models.PaymentMethod _selectedPaymentMethod;
-        public Models.PaymentMethod SelectedPaymentMethod
+        #region Properties
+        public int DaysRented
         {
-            get => _selectedPaymentMethod;
-            set
-            {
-                _selectedPaymentMethod = value;
-                OnPropertyChanged(nameof(SelectedPaymentMethod));
-            }
+            get => _daysRented;
+            set { _daysRented = value; OnPropertyChanged(); }
         }
 
-        private Models.Customer _selectedCustomer;
-        public Models.Customer SelectedCustomer
+        public double PaymentValue
         {
-            get => _selectedCustomer;
-            set
-            {
-                _selectedCustomer = value;
-                OnPropertyChanged(nameof(SelectedCustomer));
-            }
+            get => _paymentValue;
+            set { _paymentValue = value; OnPropertyChanged(); }
         }
 
-        private Models.Movie _selectedMovie;
-        public Models.Movie SelectedMovie
+        public string CustomerToSearch
         {
-            get => _selectedMovie;
-            set
-            {
-                _selectedMovie = value;
-                OnPropertyChanged(nameof(SelectedMovie));
-            }
+            get => _customerToSearch;
+            set { _customerToSearch = value; OnPropertyChanged(); }
         }
 
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            set { _statusMessage = value; OnPropertyChanged(); }
+        }
 
-        public string StatusMessage { get; set; }
-
-        private string _errorMessage;
         public string ErrorMessage
         {
             get => _errorMessage;
             set { _errorMessage = value; OnPropertyChanged(); }
         }
 
+        public Models.PaymentMethod SelectedPaymentMethod
+        {
+            get => _selectedPaymentMethod;
+            set { _selectedPaymentMethod = value; OnPropertyChanged(); }
+        }
+
+        public Models.Customer? SelectedCustomer
+        {
+            get => _selectedCustomer;
+            set { _selectedCustomer = value; OnPropertyChanged(); }
+        }
+
+        public Models.Movie? SelectedMovie
+        {
+            get => _selectedMovie;
+            set { _selectedMovie = value; OnPropertyChanged(); }
+        }
+        #endregion
+
+        #region Commands
         public ICommand SaveCommand { get; }
-
         public ICommand SearchCommand { get; }
+        #endregion
 
+        #region Constructor
         public RentalsViewModel()
         {
             SaveCommand = new RelayCommand(async () => await SaveRentalAsync());
@@ -75,17 +92,63 @@ namespace MovieRental.WPF.ViewModels
             _ = LoadMoviesAsync();
             _ = LoadCustomersAsync();
         }
+        #endregion
 
+        #region Public Methods
+        public async Task SaveRentalAsync()
+        {
+            try
+            {
+                if (SelectedCustomer == null || SelectedMovie == null)
+                {
+                    StatusMessage = "Please select both customer and movie";
+                    return;
+                }
+
+                Models.Rental newRental = new Models.Rental
+                {
+                    DaysRented = DaysRented,
+                    CustomerId = SelectedCustomer.Id,
+                    MovieId = SelectedMovie.Id,
+                    PaymentMethod = SelectedPaymentMethod,
+                    PaymentValue = PaymentValue
+                };
+
+                string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
+                HttpResponseMessage result = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "rental"), newRental);
+
+                if (result.IsSuccessStatusCode)
+                {
+                    StatusMessage = "Rental added!";
+                    ClearForm();
+                }
+                else
+                {
+                    StatusMessage = $"Save failed: {result.StatusCode}";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error: {ex.Message}";
+            }
+        }
+        #endregion
+
+        #region Private Methods
         private async Task SearchRentalAsync()
         {
             try
             {
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                List<Models.Rental>? response = await _httpClient.GetFromJsonAsync<List<Models.Rental>>(new Uri(new Uri(baseUrl), $"rental?customerName={Uri.EscapeDataString(CustomerToSearch)}"));
+                List<Models.Rental>? response = await _httpClient.GetFromJsonAsync<List<Models.Rental>>(
+                    new Uri(new Uri(baseUrl), $"rental?customerName={Uri.EscapeDataString(CustomerToSearch)}"));
 
                 Rentals.Clear();
-                foreach (Models.Rental rental in response)
-                    Rentals.Add(rental);
+                if (response != null)
+                {
+                    foreach (Models.Rental rental in response)
+                        Rentals.Add(rental);
+                }
             }
             catch (Exception ex)
             {
@@ -101,10 +164,13 @@ namespace MovieRental.WPF.ViewModels
                 List<Models.Movie>? response = await _httpClient.GetFromJsonAsync<List<Models.Movie>>(new Uri(new Uri(baseUrl), "movie"));
 
                 Movies.Clear();
-                foreach (Models.Movie movie in response)
-                    Movies.Add(movie);
+                if (response != null)
+                {
+                    foreach (Models.Movie movie in response)
+                        Movies.Add(movie);
 
-                SelectedMovie = Movies.FirstOrDefault();
+                    SelectedMovie = Movies.FirstOrDefault();
+                }
             }
             catch (Exception ex)
             {
@@ -120,10 +186,13 @@ namespace MovieRental.WPF.ViewModels
                 List<Models.Customer>? response = await _httpClient.GetFromJsonAsync<List<Models.Customer>>(new Uri(new Uri(baseUrl), "customer"));
 
                 Customers.Clear();
-                foreach (Models.Customer customer in response)
-                    Customers.Add(customer);
+                if (response != null)
+                {
+                    foreach (Models.Customer customer in response)
+                        Customers.Add(customer);
 
-                SelectedCustomer = Customers.FirstOrDefault();
+                    SelectedCustomer = Customers.FirstOrDefault();
+                }
             }
             catch (Exception ex)
             {
@@ -131,49 +200,22 @@ namespace MovieRental.WPF.ViewModels
             }
         }
 
-        public async Task SaveRentalAsync()
+        private void ClearForm()
         {
-            try
-            {
-                Models.Rental newRental = new Models.Rental
-                {
-                    DaysRented = DaysRented,
-                    CustomerId = SelectedCustomer.Id,
-                    MovieId = SelectedMovie.Id,
-                    PaymentMethod = SelectedPaymentMethod,
-                    PaymentValue = PaymentValue
-                };
-                string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                HttpResponseMessage result = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "rental"), newRental);
-
-                if (result.IsSuccessStatusCode)
-                {
-                    StatusMessage = "Rental added!";
-                    DaysRented = 0;
-                    PaymentValue = 0;
-                    SelectedMovie = Movies.FirstOrDefault();
-                    SelectedCustomer = Customers.FirstOrDefault();
-                }
-                else
-                {
-                    StatusMessage = $"Save failed: {result.StatusCode}";
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error: {ex.Message}";
-            }
-
-            OnPropertyChanged(nameof(StatusMessage));
-            OnPropertyChanged(nameof(DaysRented));
-            OnPropertyChanged(nameof(PaymentValue));
-            OnPropertyChanged(nameof(SelectedCustomer));
-            OnPropertyChanged(nameof(SelectedMovie));
-            OnPropertyChanged(nameof(SelectedPaymentMethod));
+            DaysRented = 0;
+            PaymentValue = 0;
+            SelectedMovie = Movies.FirstOrDefault();
+            SelectedCustomer = Customers.FirstOrDefault();
         }
+        #endregion
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string prop = "")
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        #region INotifyPropertyChanged Implementation
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
     }
 }

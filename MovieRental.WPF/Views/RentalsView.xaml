@@ -3,66 +3,213 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MovieRental.WPF.ViewModels"
              xmlns:local="clr-namespace:MovieRental.WPF.Views">
+    
+    <!-- DataContext -->
     <UserControl.DataContext>
         <vm:RentalsViewModel />
     </UserControl.DataContext>
 
-    <StackPanel Margin="20">
-
-        <!-- Form Section -->
-        <TextBlock Text="Add New Rental" FontWeight="Bold" Margin="0,0,0,10"/>
-
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="Customer:" Width="60" VerticalAlignment="Center"/>
-            <ComboBox ItemsSource="{Binding Customers}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedCustomer}" />
-        </StackPanel>
+    <!-- Resources -->
+    <UserControl.Resources>
+        <Style x:Key="FormLabelStyle" TargetType="TextBlock">
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
         
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="DaysRented:" Width="70" VerticalAlignment="Center"/>
-            <TextBox Text="{Binding DaysRented, UpdateSourceTrigger=PropertyChanged}" Width="40"/>
-        </StackPanel>
-
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="Movie:" Width="50" VerticalAlignment="Center"/>
-            <ComboBox ItemsSource="{Binding Movies}" DisplayMemberPath="Title" SelectedItem="{Binding SelectedMovie}" />
-        </StackPanel>
-
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="PaymentMethod:" Width="100" VerticalAlignment="Center"/>
-            <ComboBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding SelectedPaymentMethod}" />
-        </StackPanel>
-
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,10"> 
-            <TextBlock Text="PaymentValue:" Width="90" VerticalAlignment="Center"/>
-            <TextBox Text="{Binding PaymentValue, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
-        </StackPanel>
+        <Style x:Key="FormTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Width" Value="200"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+        </Style>
         
-        <Button Content="Save" Command="{Binding SaveCommand}" Width="100"/>
-        <TextBlock Text="{Binding StatusMessage}" Foreground="Green" Margin="0,10,0,0"/>
+        <Style x:Key="FormComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Width" Value="200"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+        </Style>
+        
+        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+        </Style>
+        
+        <Style x:Key="StatusMessageStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Green"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+        </Style>
+        
+        <Style x:Key="SearchSectionStyle" TargetType="Border">
+            <Setter Property="BorderBrush" Value="LightBlue"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Margin" Value="0,0,0,20"/>
+            <Setter Property="Background" Value="AliceBlue"/>
+        </Style>
+    </UserControl.Resources>
 
-        <Separator Margin="0,20,0,10"/>
+    <!-- Main Content -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="25">
 
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="Customer:" Width="90" VerticalAlignment="Center"/>
-            <TextBox Text="{Binding CustomerToSearch, UpdateSourceTrigger=PropertyChanged}" Width="150"/>
+            <!-- Search Section -->
+            <Border Style="{StaticResource SearchSectionStyle}">
+                <StackPanel>
+                    <TextBlock Text="Search Rentals" Style="{StaticResource SectionHeaderStyle}" Foreground="DarkBlue"/>
+                    
+                    <!-- Customer Search -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="Customer Name:" Style="{StaticResource FormLabelStyle}"/>
+                        <TextBox Text="{Binding CustomerToSearch, UpdateSourceTrigger=PropertyChanged}" 
+                                 Style="{StaticResource FormTextBoxStyle}"
+                                 ToolTip="Enter customer name to search for their rentals"/>
+                    </StackPanel>
+
+                    <!-- Search Button -->
+                    <Button Content="Search Rentals" 
+                            Command="{Binding SearchCommand}" 
+                            Width="140" 
+                            Height="35"
+                            Background="SteelBlue"
+                            Foreground="White"
+                            FontWeight="Medium"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Form Section -->
+            <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="5" Padding="20" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Create New Rental" Style="{StaticResource SectionHeaderStyle}"/>
+
+                    <!-- Customer Selection -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Customer:" Style="{StaticResource FormLabelStyle}"/>
+                        <ComboBox ItemsSource="{Binding Customers}" 
+                                  SelectedItem="{Binding SelectedCustomer}"
+                                  DisplayMemberPath="Name"
+                                  Style="{StaticResource FormComboBoxStyle}"
+                                  ToolTip="Select a customer for this rental"/>
+                    </StackPanel>
+
+                    <!-- Movie Selection -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Movie:" Style="{StaticResource FormLabelStyle}"/>
+                        <ComboBox ItemsSource="{Binding Movies}" 
+                                  SelectedItem="{Binding SelectedMovie}"
+                                  DisplayMemberPath="Title"
+                                  Style="{StaticResource FormComboBoxStyle}"
+                                  ToolTip="Select a movie to rent"/>
+                    </StackPanel>
+
+                    <!-- Days Rented -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Days Rented:" Style="{StaticResource FormLabelStyle}"/>
+                        <TextBox Text="{Binding DaysRented, UpdateSourceTrigger=PropertyChanged}" 
+                                 Style="{StaticResource FormTextBoxStyle}"
+                                 ToolTip="Number of days for the rental"/>
+                    </StackPanel>
+
+                    <!-- Payment Value -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Payment Value:" Style="{StaticResource FormLabelStyle}"/>
+                        <TextBox Text="{Binding PaymentValue, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
+                                 Style="{StaticResource FormTextBoxStyle}"
+                                 ToolTip="Total payment amount"/>
+                    </StackPanel>
+
+                    <!-- Payment Method -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="Payment Method:" Style="{StaticResource FormLabelStyle}"/>
+                        <ComboBox ItemsSource="{Binding PaymentMethods}" 
+                                  SelectedItem="{Binding SelectedPaymentMethod}"
+                                  Style="{StaticResource FormComboBoxStyle}"
+                                  ToolTip="Select payment method"/>
+                    </StackPanel>
+
+                    <!-- Action Button -->
+                    <Button Content="Save Rental" 
+                            Command="{Binding SaveCommand}" 
+                            Width="120" 
+                            Height="35"
+                            Background="MediumSeaGreen"
+                            Foreground="White"
+                            FontWeight="Medium"/>
+
+                    <!-- Status Message -->
+                    <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource StatusMessageStyle}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Rentals List Section -->
+            <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="5" Padding="20">
+                <StackPanel>
+                    <TextBlock Text="Rental Records" Style="{StaticResource SectionHeaderStyle}"/>
+                    
+                    <ListView ItemsSource="{Binding Rentals}" Height="300" BorderBrush="Gray" BorderThickness="1">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="ID" DisplayMemberBinding="{Binding Id}" Width="60">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Background" Value="LightGreen"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                </GridViewColumn>
+                                
+                                <GridViewColumn Header="Customer" DisplayMemberBinding="{Binding Customer.Name}" Width="100">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Background" Value="LightGreen"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                </GridViewColumn>
+                                
+                                <GridViewColumn Header="Movie" DisplayMemberBinding="{Binding Movie.Title}" Width="80">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Background" Value="LightGreen"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                </GridViewColumn>
+                                
+                                <GridViewColumn Header="Days" DisplayMemberBinding="{Binding DaysRented}" Width="60">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Background" Value="LightGreen"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                </GridViewColumn>
+                                
+                                <GridViewColumn Header="Payment Value" DisplayMemberBinding="{Binding PaymentValue, StringFormat=C}" Width="120">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Background" Value="LightGreen"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                </GridViewColumn>
+                                
+                                <GridViewColumn Header="Payment Method" DisplayMemberBinding="{Binding PaymentMethod}" Width="120">
+                                    <GridViewColumn.HeaderContainerStyle>
+                                        <Style TargetType="GridViewColumnHeader">
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="Background" Value="LightGreen"/>
+                                        </Style>
+                                    </GridViewColumn.HeaderContainerStyle>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
-        <Button Content="Search" Command="{Binding SearchCommand}" Width="100"/>
-
-        <!-- List Section -->
-        <TextBlock Text="Rentals" FontWeight="Bold" Margin="0,0,0,10"/>
-        <ListView ItemsSource="{Binding Rentals}" Height="200">
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Header="Id" DisplayMemberBinding="{Binding Id}" Width="150"/>
-                    <GridViewColumn Header="DaysRented" DisplayMemberBinding="{Binding DaysRented}" Width="200"/>
-                    <GridViewColumn Header="MovieTitle" DisplayMemberBinding="{Binding Movie.Title}" Width="200"/>
-                    <GridViewColumn Header="PaymentMethod" DisplayMemberBinding="{Binding PaymentMethod}" Width="200"/>
-                    <GridViewColumn Header="PaymentValue" DisplayMemberBinding="{Binding PaymentValue}" Width="200"/>
-                    <GridViewColumn Header="CustomerName" DisplayMemberBinding="{Binding Customer.Name}" Width="200"/>
-                    <GridViewColumn Header="CustomerEmail" DisplayMemberBinding="{Binding Customer.Email}" Width="200"/>
-                    <GridViewColumn Header="CustomerPhone" DisplayMemberBinding="{Binding Customer.Phone}" Width="200"/>
-                </GridView>
-            </ListView.View>
-        </ListView>
-    </StackPanel>
+    </ScrollViewer>
 </UserControl>

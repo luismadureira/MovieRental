@@ -10,49 +10,58 @@ namespace MovieRental.WPF.ViewModels
 {
     public class MoviesViewModel : INotifyPropertyChanged
     {
+        #region Fields
         private readonly HttpClient _httpClient = new HttpClient();
+        private string _title = string.Empty;
+        private string _statusMessage = string.Empty;
+        private string _errorMessage = string.Empty;
+        #endregion
 
+        #region Properties
         public ObservableCollection<Models.Movie> Movies { get; set; } = new();
 
-        public string Title { get; set; }
-        public string StatusMessage { get; set; }
+        public string Title
+        {
+            get => _title;
+            set { _title = value; OnPropertyChanged(); }
+        }
 
-        private string _errorMessage;
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            set { _statusMessage = value; OnPropertyChanged(); }
+        }
+
         public string ErrorMessage
         {
             get => _errorMessage;
             set { _errorMessage = value; OnPropertyChanged(); }
         }
+        #endregion
 
+        #region Commands
         public ICommand SaveCommand { get; }
+        #endregion
 
+        #region Constructor
         public MoviesViewModel()
         {
             SaveCommand = new RelayCommand(async () => await SaveMovieAsync());
             _ = LoadMoviesAsync();
         }
+        #endregion
 
-        private async Task LoadMoviesAsync()
-        {
-            try
-            {
-                string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                List<Models.Movie>? response = await _httpClient.GetFromJsonAsync<List<Models.Movie>>(new Uri(new Uri(baseUrl), "movie"));
-
-                Movies.Clear();
-                foreach (Models.Movie movie in response)
-                    Movies.Add(movie);
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error loading movies: {ex.Message}";
-            }
-        }
-
+        #region Public Methods
         public async Task SaveMovieAsync()
         {
             try
             {
+                if (Title == string.Empty)
+                {
+                    StatusMessage = "Title field is required.";
+                    return;
+                }
+
                 Models.Movie newMovie = new Models.Movie { Title = Title };
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
                 HttpResponseMessage result = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "movie"), newMovie);
@@ -60,7 +69,7 @@ namespace MovieRental.WPF.ViewModels
                 if (result.IsSuccessStatusCode)
                 {
                     StatusMessage = "Movie added!";
-                    Title = string.Empty;
+                    ClearForm();
                     await LoadMoviesAsync();
                 }
                 else
@@ -72,13 +81,43 @@ namespace MovieRental.WPF.ViewModels
             {
                 StatusMessage = $"Error: {ex.Message}";
             }
+        }
+        #endregion
 
-            OnPropertyChanged(nameof(StatusMessage));
-            OnPropertyChanged(nameof(Title));
+        #region Private Methods
+        private async Task LoadMoviesAsync()
+        {
+            try
+            {
+                string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
+                List<Models.Movie>? response = await _httpClient.GetFromJsonAsync<List<Models.Movie>>(new Uri(new Uri(baseUrl), "movie"));
+
+                Movies.Clear();
+                if (response != null)
+                {
+                    foreach (Models.Movie movie in response)
+                        Movies.Add(movie);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error loading movies: {ex.Message}";
+            }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string prop = "")
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        private void ClearForm()
+        {
+            Title = string.Empty;
+        }
+        #endregion
+
+        #region INotifyPropertyChanged Implementation
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
     }
 }
