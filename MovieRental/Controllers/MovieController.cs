@@ -15,16 +15,18 @@ namespace MovieRental.Controllers
             _features = features;
         }
 
-        [HttpGet]
-        public IActionResult Get()
+        [HttpPost]
+        [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(Movie.Movie))]
+        public async Task<IActionResult> Post([FromBody] Movie.Movie movie)
         {
-	        return Ok(_features.GetAll());
+            return StatusCode(StatusCodes.Status201Created, await _features.SaveAsync(movie));
         }
 
-        [HttpPost]
-        public IActionResult Post([FromBody] Movie.Movie movie)
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Movie.Movie))]
+        public async Task<IActionResult> Get()
         {
-	        return Ok(_features.Save(movie));
+            return StatusCode(StatusCodes.Status200OK, await _features.GetAllAsync());
         }
     }
 }

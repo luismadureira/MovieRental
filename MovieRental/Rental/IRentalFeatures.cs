@@ -2,6 +2,6 @@
 
 public interface IRentalFeatures
 {
-	Rental Save(Rental rental);
-	IEnumerable<Rental> GetRentalsByCustomerName(string customerName);
+    Task<Rental> SaveAsync(Rental rental);
+    Task<IEnumerable<Rental>> GetRentalsByCustomerNameAsync(string customerName);
 }
