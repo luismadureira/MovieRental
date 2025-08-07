@@ -46,7 +46,7 @@ namespace MovieRental.Test.Unit
                 new Customer.Customer { Id = 1, Name = "John Doe", Email = "john.doe@example.com" },
                 new Customer.Customer { Id = 2, Name = "Jane Smith", Email = "jane.smith@example.com" }
             };
-            _mockCustomerFeatures.Setup(f => f.GetAllAsync()).ReturnsAsync(customers);
+            _mockCustomerFeatures.Setup(f => f.GetAllAsync(100, 1)).ReturnsAsync(customers);
 
             // Act
             IActionResult result = await _controller.Get();

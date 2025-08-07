@@ -6,37 +6,57 @@ namespace MovieRental.Movie
     public class MovieFeatures : IMovieFeatures
     {
         private readonly MovieRentalDbContext _movieRentalDb;
+
         public MovieFeatures(MovieRentalDbContext movieRentalDb)
         {
-            _movieRentalDb = movieRentalDb;
+            _movieRentalDb = movieRentalDb ?? throw new ArgumentNullException(nameof(movieRentalDb));
         }
 
         /// <summary>
-        /// Saves a movie to the database asynchronously.
-        /// Note: This method always performs an insert operation and does not handle updates.
-        /// If the movie already exists in the database, this will cause a primary key violation.
+        /// Saves or updates a movie in the database asynchronously.
+        /// Automatically determines whether to insert or update based on Id value.
         /// </summary>
         /// <param name="movie">The movie entity to save to the database.</param>
-        /// <returns>The saved movie entity with any database-generated values (like Id).</returns>
-        /// <exception cref="InvalidOperationException">Thrown when attempting to save a movie that already exists in the database.</exception>
+        /// <returns>The saved movie entity with any database-generated values.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when movie is null.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when the save operation fails.</exception>
         public async Task<Movie> SaveAsync(Movie movie)
         {
+            if (movie == null)
+                throw new ArgumentNullException(nameof(movie), "Movie cannot be null");
+
+            if (string.IsNullOrWhiteSpace(movie.Title))
+                throw new ArgumentException("Movie title cannot be empty", nameof(movie));
+
             try
             {
-                // Validate movie object here if needed
-                if (movie == null)
+                if (movie.Id == 0)
                 {
-                    throw new ArgumentNullException(nameof(movie), "Movie cannot be null");
+                    await _movieRentalDb.Movies.AddAsync(movie).ConfigureAwait(false);
+                }
+                else
+                {
+                    // Use Attach and SetModified for better tracking
+                    Movie? existingMovie = await _movieRentalDb.Movies
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(m => m.Id == movie.Id)
+                        .ConfigureAwait(false);
+
+                    if (existingMovie == null)
+                        throw new InvalidOperationException($"Movie with ID {movie.Id} not found");
+
+                    _movieRentalDb.Entry(movie).State = EntityState.Modified;
                 }
 
-                // Add the movie to the database
-                await _movieRentalDb.Movies.AddAsync(movie).ConfigureAwait(false);
                 await _movieRentalDb.SaveChangesAsync().ConfigureAwait(false);
+
+                // Detach entity to prevent tracking issues
+                _movieRentalDb.Entry(movie).State = EntityState.Detached;
+
                 return movie;
             }
             catch (Exception ex)
             {
-                // Log the exception
                 throw new InvalidOperationException("Failed to save movie", ex);
             }
         }
@@ -46,18 +66,21 @@ namespace MovieRental.Movie
         /// </summary>
         public async Task<IEnumerable<Movie>> GetAllAsync(int pageSize = 100, int pageNumber = 1)
         {
+            if (pageSize <= 0) pageSize = 100;
+            if (pageNumber <= 0) pageNumber = 1;
+
             try
             {
                 return await _movieRentalDb.Movies
-                    .AsNoTracking() // Prevent EF from tracking entities - saves memory
+                    .AsNoTracking()
                     .Skip((pageNumber - 1) * pageSize)
                     .Take(pageSize)
+                    .OrderBy(m => m.Title)
                     .ToListAsync()
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                // Log the exception
                 throw new InvalidOperationException("Failed to retrieve movies", ex);
             }
         }

@@ -11,70 +11,67 @@ namespace MovieRental.Rental
 
         public RentalFeatures(MovieRentalDbContext movieRentalDb, PaymentProviderFactory paymentProviderFactory)
         {
-            _movieRentalDb = movieRentalDb;
-            _paymentProviderFactory = paymentProviderFactory;
+            _movieRentalDb = movieRentalDb ?? throw new ArgumentNullException(nameof(movieRentalDb));
+            _paymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
         }
 
         /// <summary>
-        /// Save a rental to the database asynchronously
+        /// Saves a rental to the database asynchronously with payment processing.
         /// </summary>
-        /// <param name="rental">The rental object to save</param>
-        /// <returns>The saved rental object</returns>
         public async Task<Rental> SaveAsync(Rental rental)
         {
+            if (rental == null)
+                throw new ArgumentNullException(nameof(rental), "Rental cannot be null");
+
+            if (rental.PaymentValue <= 0)
+                throw new ArgumentException("Payment value must be greater than zero", nameof(rental));
+
             try
             {
-                // Validate rental object here if needed
-                if (rental == null)
-                {
-                    throw new ArgumentNullException(nameof(rental), "Rental cannot be null");
-                }
-
                 // Resolve the payment provider
                 IPaymentProvider paymentProvider = _paymentProviderFactory.GetPaymentProvider(rental.PaymentMethod);
 
                 // Process payment
-                bool paymentSuccess = await paymentProvider.Pay(rental.PaymentValue);
+                bool paymentSuccess = await paymentProvider.Pay(rental.PaymentValue).ConfigureAwait(false);
 
                 if (!paymentSuccess)
-                {
                     throw new InvalidOperationException("Payment failed");
-                }
 
                 // Save rental to the database
-                await _movieRentalDb.Rentals.AddAsync(rental);
-                await _movieRentalDb.SaveChangesAsync();
+                await _movieRentalDb.Rentals.AddAsync(rental).ConfigureAwait(false);
+                await _movieRentalDb.SaveChangesAsync().ConfigureAwait(false);
                 return rental;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is InvalidOperationException) && !(ex is ArgumentException))
             {
-                // Log the exception
                 throw new InvalidOperationException("Failed to save rental", ex);
             }
         }
 
         /// <summary>
-        /// Get rentals by customer name asynchronously
+        /// Gets rentals by customer name asynchronously with proper navigation properties.
         /// </summary>
-        /// <param name="customerName">The customer name to search for</param>
-        /// <returns>A collection of rentals for the specified customer</returns>
         public async Task<IEnumerable<Rental>> GetRentalsByCustomerNameAsync(string customerName)
         {
+            if (string.IsNullOrWhiteSpace(customerName))
+                return Enumerable.Empty<Rental>();
+
             try
             {
                 return await _movieRentalDb.Rentals
-                .Include(r => r.Customer)    // Load Customer entity
-                .Include(r => r.Movie)       // Load Movie entity if needed
-                .Where(r => r.Customer != null &&
-                       r.Customer.Name.ToLower().Contains(customerName.ToLower()))
-                .ToListAsync();
+                    .Include(r => r.Customer)
+                    .Include(r => r.Movie)
+                    .AsNoTracking()
+                    .Where(r => r.Customer != null &&
+                               r.Customer.Name.ToLower().Contains(customerName.ToLower()))
+                    .OrderByDescending(r => r.Id)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                // Log the exception
-                throw new InvalidOperationException("Failed to retrieve rentals", ex);
+                throw new InvalidOperationException("Failed to retrieve rentals by customer name", ex);
             }
         }
-
     }
 }

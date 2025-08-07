@@ -11,16 +11,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddEntityFrameworkSqlite().AddDbContext<MovieRentalDbContext>();
 
-
-
-//problem: The app is throwing an error when we start, please help us.
-//      Also, tell us what caused the issue.
-//solution: You are registering RentalFeatures as a singleton, but its constructor requires 
-//      a MovieRentalDbContext, which is registered as a scoped service which means a new
-//      instance of MovieRentalDbContext is created per HTTP request(in web apps).
-//      A singleton would hold onto a single instance of the scoped service, breaking the 
-//      intended lifetime management.
-
 builder.Services.AddScoped<IMovieFeatures, MovieFeatures>();
 builder.Services.AddScoped<IRentalFeatures, RentalFeatures>();
 builder.Services.AddScoped<ICustomerFeatures, CustomerFeatures>();
@@ -40,17 +30,19 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
-app.MapControllers();
-
-//Add Global Exception Handling
+//Add Global Exception Handling BEFORE mapping controllers
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(GlobalExceptionHandler.HandleException);
 });
 
-using (MovieRentalDbContext client = new MovieRentalDbContext())
+app.MapControllers();
+
+// Properly scope the DbContext for database initialization
+using (IServiceScope scope = app.Services.CreateScope())
 {
-    client.Database.EnsureCreated();
+    MovieRentalDbContext context = scope.ServiceProvider.GetRequiredService<MovieRentalDbContext>();
+    await context.Database.EnsureCreatedAsync();
 }
 
 app.Run();

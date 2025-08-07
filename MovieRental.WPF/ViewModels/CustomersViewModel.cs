@@ -4,19 +4,23 @@ using System.Configuration;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 
 namespace MovieRental.WPF.ViewModels
 {
-    public class CustomersViewModel : INotifyPropertyChanged
+    public class CustomersViewModel : INotifyPropertyChanged, IDisposable
     {
         #region Fields
-        private readonly HttpClient _httpClient = new HttpClient();
+        private static readonly HttpClient s_httpClient = CreateHttpClient();
+        private bool _disposed = false;
         private string _name = string.Empty;
         private string _email = string.Empty;
         private string _phone = string.Empty;
         private string _statusMessage = string.Empty;
         private string _errorMessage = string.Empty;
+        private bool _isLoading = false;
+        private Models.Customer? _selectedCustomer;
         #endregion
 
         #region Properties
@@ -25,19 +29,19 @@ namespace MovieRental.WPF.ViewModels
         public string Name
         {
             get => _name;
-            set { _name = value; OnPropertyChanged(); }
+            set { _name = value; OnPropertyChanged(); ValidateForm(); }
         }
 
         public string Email
         {
             get => _email;
-            set { _email = value; OnPropertyChanged(); }
+            set { _email = value; OnPropertyChanged(); ValidateForm(); }
         }
 
         public string Phone
         {
             get => _phone;
-            set { _phone = value; OnPropertyChanged(); }
+            set { _phone = value; OnPropertyChanged(); ValidateForm(); }
         }
 
         public string StatusMessage
@@ -51,6 +55,25 @@ namespace MovieRental.WPF.ViewModels
             get => _errorMessage;
             set { _errorMessage = value; OnPropertyChanged(); }
         }
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set { _isLoading = value; OnPropertyChanged(); }
+        }
+
+        public Models.Customer? SelectedCustomer
+        {
+            get => _selectedCustomer;
+            set
+            {
+                _selectedCustomer = value;
+                OnPropertyChanged();
+                LoadCustomerForEdit();
+            }
+        }
+
+        public bool IsFormValid => !string.IsNullOrWhiteSpace(Name);
         #endregion
 
         #region Commands
@@ -60,40 +83,98 @@ namespace MovieRental.WPF.ViewModels
         #region Constructor
         public CustomersViewModel()
         {
-            SaveCommand = new RelayCommand(async () => await SaveCustomerAsync());
-            _ = LoadCustomersAsync();
+            SaveCommand = new RelayCommand(async () => await SaveCustomerAsync().ConfigureAwait(false), () => IsFormValid && !IsLoading);
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await LoadCustomersAsync();
+                }
+                catch (Exception ex)
+                {
+                    ErrorMessage = $"Failed to load initial data: {ex.Message}";
+                }
+            });
+        }
+
+        private static HttpClient CreateHttpClient()
+        {
+            HttpClient client = new HttpClient()
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+
+            client.DefaultRequestHeaders.Add("User-Agent", "MovieRental-WPF/1.0");
+            return client;
         }
         #endregion
 
         #region Public Methods
         public async Task SaveCustomerAsync()
         {
+            if (!IsFormValid) return;
+
+            IsLoading = true;
+            ErrorMessage = string.Empty;
+
             try
             {
-                if (Name == string.Empty)
+                Models.Customer customer = new Models.Customer
                 {
-                    StatusMessage = "Name field is required.";
-                    return;
-                }
+                    Id = SelectedCustomer?.Id ?? 0,
+                    Name = Name.Trim(),
+                    Email = Email.Trim(),
+                    Phone = Phone.Trim()
+                };
 
-                Models.Customer newCustomer = new Models.Customer { Name = Name, Email = Email, Phone = Phone };
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                HttpResponseMessage result = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "customer"), newCustomer);
+                if (string.IsNullOrWhiteSpace(baseUrl))
+                    throw new InvalidOperationException("ApiBaseUrl not configured");
 
-                if (result.IsSuccessStatusCode)
+                HttpResponseMessage result;
+
+                if (customer.Id == 0)
                 {
-                    StatusMessage = "Customer added!";
-                    ClearForm();
-                    await LoadCustomersAsync();
+                    result = await s_httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "customer"), customer)
+                        .ConfigureAwait(false);
                 }
                 else
                 {
-                    StatusMessage = $"Save failed: {result.StatusCode}";
+                    result = await s_httpClient.PutAsJsonAsync(new Uri(new Uri(baseUrl), $"customer/{customer.Id}"), customer)
+                        .ConfigureAwait(false);
                 }
+
+                using (result)
+                {
+                    if (result.IsSuccessStatusCode)
+                    {
+                        StatusMessage = customer.Id == 0 ? "Customer added!" : "Customer updated!";
+                        ClearForm();
+                        await LoadCustomersAsync().ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        string errorContent = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        ErrorMessage = $"Save failed: {result.StatusCode}. {errorContent}";
+                    }
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                ErrorMessage = $"Network error: {ex.Message}";
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+            {
+                ErrorMessage = "Request timed out. Please try again.";
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error: {ex.Message}";
+                ErrorMessage = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                IsLoading = false;
             }
         }
         #endregion
@@ -101,21 +182,62 @@ namespace MovieRental.WPF.ViewModels
         #region Private Methods
         private async Task LoadCustomersAsync()
         {
+            IsLoading = true;
+            ErrorMessage = string.Empty;
+
             try
             {
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                List<Models.Customer>? response = await _httpClient.GetFromJsonAsync<List<Models.Customer>>(new Uri(new Uri(baseUrl), "customer"));
+                if (string.IsNullOrWhiteSpace(baseUrl))
+                    throw new InvalidOperationException("ApiBaseUrl not configured");
 
-                Customers.Clear();
-                if (response != null)
+                using HttpResponseMessage response = await s_httpClient.GetAsync(new Uri(new Uri(baseUrl), "customer"));
+
+                if (response.IsSuccessStatusCode)
                 {
-                    foreach (Models.Customer customer in response)
-                        Customers.Add(customer);
+                    List<Models.Customer>? customers = await response.Content.ReadFromJsonAsync<List<Models.Customer>>();
+
+                    if (customers != null)
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            Customers.Clear();
+                            foreach (Models.Customer? customer in customers.OrderBy(c => c.Name))
+                                Customers.Add(customer);
+                        });
+                    }
                 }
+                else
+                {
+                    string errorContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    ErrorMessage = $"Failed to load customers: {response.StatusCode}. {errorContent}";
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                ErrorMessage = $"Network error: {ex.Message}";
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+            {
+                ErrorMessage = "Request timed out. Please try again.";
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error loading customers: {ex.Message}";
+                ErrorMessage = $"Error loading customers: {ex.Message}";
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private void LoadCustomerForEdit()
+        {
+            if (SelectedCustomer != null)
+            {
+                Name = SelectedCustomer.Name;
+                Email = SelectedCustomer.Email ?? string.Empty;
+                Phone = SelectedCustomer.Phone ?? string.Empty;
             }
         }
 
@@ -124,6 +246,14 @@ namespace MovieRental.WPF.ViewModels
             Name = string.Empty;
             Email = string.Empty;
             Phone = string.Empty;
+            SelectedCustomer = null;
+            StatusMessage = string.Empty;
+            ErrorMessage = string.Empty;
+        }
+
+        private void ValidateForm()
+        {
+            OnPropertyChanged(nameof(IsFormValid));
         }
         #endregion
 
@@ -133,6 +263,23 @@ namespace MovieRental.WPF.ViewModels
         protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
+
+        #region IDisposable Implementation
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed && disposing)
+            {
+                // Static HttpClient not disposed here
+            }
+            _disposed = true;
         }
         #endregion
     }
