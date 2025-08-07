@@ -8,10 +8,11 @@ using System.Windows.Input;
 
 namespace MovieRental.WPF.ViewModels
 {
-    public class MoviesViewModel : INotifyPropertyChanged
+    public class MoviesViewModel : INotifyPropertyChanged, IDisposable
     {
         #region Fields
         private readonly HttpClient _httpClient = new HttpClient();
+        private bool _disposed = false;
         private string _title = string.Empty;
         private string _statusMessage = string.Empty;
         private string _errorMessage = string.Empty;
@@ -64,9 +65,10 @@ namespace MovieRental.WPF.ViewModels
 
                 Models.Movie newMovie = new Models.Movie { Title = Title };
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                HttpResponseMessage result = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "movie"), newMovie);
+                using HttpResponseMessage response = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "movie"), newMovie)
+                    .ConfigureAwait(false);
 
-                if (result.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
                 {
                     StatusMessage = "Movie added!";
                     ClearForm();
@@ -74,7 +76,7 @@ namespace MovieRental.WPF.ViewModels
                 }
                 else
                 {
-                    StatusMessage = $"Save failed: {result.StatusCode}";
+                    StatusMessage = $"Save failed: {response.StatusCode}";
                 }
             }
             catch (Exception ex)
@@ -90,12 +92,14 @@ namespace MovieRental.WPF.ViewModels
             try
             {
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                List<Models.Movie>? response = await _httpClient.GetFromJsonAsync<List<Models.Movie>>(new Uri(new Uri(baseUrl), "movie"));
+                using HttpResponseMessage response = await _httpClient.GetAsync(new Uri(new Uri(baseUrl), "movie"));
+
+                List<Models.Movie>? movies = await response.Content.ReadFromJsonAsync<List<Models.Movie>>();
 
                 Movies.Clear();
-                if (response != null)
+                if (movies != null)
                 {
-                    foreach (Models.Movie movie in response)
+                    foreach (Models.Movie movie in movies)
                         Movies.Add(movie);
                 }
             }
@@ -117,6 +121,23 @@ namespace MovieRental.WPF.ViewModels
         protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
+
+        #region IDisposable Implementation
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed && disposing)
+            {
+                _httpClient?.Dispose();
+            }
+            _disposed = true;
         }
         #endregion
     }

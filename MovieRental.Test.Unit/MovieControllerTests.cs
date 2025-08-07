@@ -45,7 +45,7 @@ namespace MovieRental.Test.Unit
                 new Movie.Movie { Id = 1, Title = "Inception" },
                 new Movie.Movie { Id = 2, Title = "The Matrix" }
             };
-            _mockMovieFeatures.Setup(f => f.GetAllAsync()).ReturnsAsync(movies);
+            _mockMovieFeatures.Setup(f => f.GetAllAsync(100, 1)).ReturnsAsync(movies);
 
             // Act
             IActionResult result = await _controller.Get();

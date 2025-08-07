@@ -11,7 +11,7 @@ namespace MovieRental.Movie
             _movieRentalDb = movieRentalDb;
         }
 
-        // <summary>
+        /// <summary>
         /// Saves a movie to the database asynchronously.
         /// Note: This method always performs an insert operation and does not handle updates.
         /// If the movie already exists in the database, this will cause a primary key violation.
@@ -30,8 +30,8 @@ namespace MovieRental.Movie
                 }
 
                 // Add the movie to the database
-                await _movieRentalDb.Movies.AddAsync(movie);
-                await _movieRentalDb.SaveChangesAsync();
+                await _movieRentalDb.Movies.AddAsync(movie).ConfigureAwait(false);
+                await _movieRentalDb.SaveChangesAsync().ConfigureAwait(false);
                 return movie;
             }
             catch (Exception ex)
@@ -41,22 +41,19 @@ namespace MovieRental.Movie
             }
         }
 
-        // TODO: tell us what is wrong in this method? Forget about the async, what other concerns do you have?
-        //Potential issues with this method:
-        //- No handling for null reference issues. For example we have no validation that _movieRentalDb or _movieRentalDb.Movies exists.
-        //- Loading ALL movies without filtering/pagination into memory at once could cause memory issues.
-        //With thousands of movies, this could cause OutOfMemoryException.
-
         /// <summary>
-        /// Retrieves all movies from the database asynchronously.
+        /// Retrieves movies with pagination to prevent memory issues.
         /// </summary>
-        /// <returns>A list of all movies in the database.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when there are database connectivity issues.</exception>
-        public async Task<IEnumerable<Movie>> GetAllAsync()
+        public async Task<IEnumerable<Movie>> GetAllAsync(int pageSize = 100, int pageNumber = 1)
         {
             try
             {
-                return await _movieRentalDb.Movies.ToListAsync();
+                return await _movieRentalDb.Movies
+                    .AsNoTracking() // Prevent EF from tracking entities - saves memory
+                    .Skip((pageNumber - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -64,7 +61,5 @@ namespace MovieRental.Movie
                 throw new InvalidOperationException("Failed to retrieve movies", ex);
             }
         }
-
-
     }
 }

@@ -8,10 +8,11 @@ using System.Windows.Input;
 
 namespace MovieRental.WPF.ViewModels
 {
-    public class RentalsViewModel : INotifyPropertyChanged
+    public class RentalsViewModel : INotifyPropertyChanged, IDisposable
     {
         #region Fields
         private readonly HttpClient _httpClient = new HttpClient();
+        private bool _disposed = false;
         private int _daysRented;
         private double _paymentValue;
         private string _customerToSearch = string.Empty;
@@ -105,6 +106,18 @@ namespace MovieRental.WPF.ViewModels
                     return;
                 }
 
+                if (PaymentValue <= 0)
+                {
+                    StatusMessage = "Payment value field is required.";
+                    return;
+                }
+
+                if (DaysRented <= 0)
+                {
+                    StatusMessage = "Days rented value field is required.";
+                    return;
+                }
+
                 Models.Rental newRental = new Models.Rental
                 {
                     DaysRented = DaysRented,
@@ -115,16 +128,17 @@ namespace MovieRental.WPF.ViewModels
                 };
 
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                HttpResponseMessage result = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "rental"), newRental);
+                using HttpResponseMessage response = await _httpClient.PostAsJsonAsync(new Uri(new Uri(baseUrl), "rental"), newRental)
+                    .ConfigureAwait(false);
 
-                if (result.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
                 {
                     StatusMessage = "Rental added!";
                     ClearForm();
                 }
                 else
                 {
-                    StatusMessage = $"Save failed: {result.StatusCode}";
+                    StatusMessage = $"Save failed: {response.StatusCode}";
                 }
             }
             catch (Exception ex)
@@ -139,14 +153,22 @@ namespace MovieRental.WPF.ViewModels
         {
             try
             {
+                if (String.IsNullOrEmpty(CustomerToSearch))
+                {
+                    StatusMessage = "Customer name field is required.";
+                    return;
+                }
+
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                List<Models.Rental>? response = await _httpClient.GetFromJsonAsync<List<Models.Rental>>(
+                using HttpResponseMessage response = await _httpClient.GetAsync(
                     new Uri(new Uri(baseUrl), $"rental?customerName={Uri.EscapeDataString(CustomerToSearch)}"));
 
+                List<Models.Rental>? rentals = await response.Content.ReadFromJsonAsync<List<Models.Rental>>();
+
                 Rentals.Clear();
-                if (response != null)
+                if (rentals != null)
                 {
-                    foreach (Models.Rental rental in response)
+                    foreach (Models.Rental rental in rentals)
                         Rentals.Add(rental);
                 }
             }
@@ -161,12 +183,14 @@ namespace MovieRental.WPF.ViewModels
             try
             {
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                List<Models.Movie>? response = await _httpClient.GetFromJsonAsync<List<Models.Movie>>(new Uri(new Uri(baseUrl), "movie"));
+                using HttpResponseMessage response = await _httpClient.GetAsync(new Uri(new Uri(baseUrl), "movie"));
+
+                List<Models.Movie>? movies = await response.Content.ReadFromJsonAsync<List<Models.Movie>>();
 
                 Movies.Clear();
-                if (response != null)
+                if (movies != null)
                 {
-                    foreach (Models.Movie movie in response)
+                    foreach (Models.Movie movie in movies)
                         Movies.Add(movie);
 
                     SelectedMovie = Movies.FirstOrDefault();
@@ -183,12 +207,14 @@ namespace MovieRental.WPF.ViewModels
             try
             {
                 string? baseUrl = ConfigurationManager.AppSettings["ApiBaseUrl"];
-                List<Models.Customer>? response = await _httpClient.GetFromJsonAsync<List<Models.Customer>>(new Uri(new Uri(baseUrl), "customer"));
+                using HttpResponseMessage response = await _httpClient.GetAsync(new Uri(new Uri(baseUrl), "customer"));
+
+                List<Models.Customer>? customers = await response.Content.ReadFromJsonAsync<List<Models.Customer>>();
 
                 Customers.Clear();
-                if (response != null)
+                if (customers != null)
                 {
-                    foreach (Models.Customer customer in response)
+                    foreach (Models.Customer customer in customers)
                         Customers.Add(customer);
 
                     SelectedCustomer = Customers.FirstOrDefault();
@@ -215,6 +241,23 @@ namespace MovieRental.WPF.ViewModels
         protected void OnPropertyChanged([CallerMemberName] string propertyName = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
+
+        #region IDisposable Implementation
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed && disposing)
+            {
+                _httpClient?.Dispose();
+            }
+            _disposed = true;
         }
         #endregion
     }
