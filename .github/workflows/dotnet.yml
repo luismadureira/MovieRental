@@ -2,7 +2,7 @@ name: .NET CI
 
 on:
   push:
-    branches: [ "main", "development" ]   # corre quando há push em main ou development
+    branches: [ "main" ]   # corre quando há push em main
   pull_request:
     branches: [ "main", "development" ]   # corre em PRs para main ou development
 
