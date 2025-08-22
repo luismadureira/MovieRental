@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movierental-api
+  namespace: prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: movierental-api
+  template:
+    metadata:
+      labels:
+        app: movierental-api
+    spec:
+      containers:
+      - name: movierental-api
+        image: acrmovierentalapi.azurecr.io/movierental-api:REPLACE_ME
+        ports:
+        - containerPort: 80
